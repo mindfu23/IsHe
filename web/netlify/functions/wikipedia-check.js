@@ -40,16 +40,17 @@ exports.handler = async (event) => {
 
     const pageTitle = searchResults[0].title;
 
-    // Get the page content
+    // Get the page content - get more than just intro
     const pageResponse = await axios.get('https://en.wikipedia.org/w/api.php', {
       params: {
         action: 'query',
         titles: pageTitle,
-        prop: 'extracts|info',
-        exintro: true,
+        prop: 'extracts|info|categories',
         explaintext: true,
         format: 'json',
-        inprop: 'url'
+        inprop: 'url',
+        exlimit: 1,
+        exchars: 2000  // Get first 2000 characters instead of just intro
       }
     });
 
@@ -65,23 +66,30 @@ exports.handler = async (event) => {
       };
     }
 
-    // Check for death indicators in the first paragraph
+    // Check for death indicators in the text
     const extract = page.extract.toLowerCase();
-    const title = page.title.toLowerCase();
+    const categories = page.categories || [];
+    
+    // Check categories for death-related ones
+    const hasDeathCategory = categories.some(cat => 
+      cat.title.toLowerCase().includes('deaths') || 
+      cat.title.toLowerCase().includes('deceased')
+    );
     
     const deathIndicators = [
       /\d{4}\s*[-–—]\s*\d{4}/,  // Birth-death year pattern like "1947 – 2016"
       /\(\s*\d{4}\s*[-–—]\s*\d{4}\s*\)/,  // (1947 – 2016)
+      /january|february|march|april|may|june|july|august|september|october|november|december\s+\d{1,2},?\s+\d{4}/i,  // Date of death
       'died',
       'death',
       'passed away',
-      'deceased',
-      /died\s+\w+\s+\d{1,2},?\s+\d{4}/,  // died January 1, 2024
-      /\d{4}\s*–\s*present/  // Still alive indicator
+      'deceased'
     ];
 
     // Check if "present" appears (means they're alive)
-    if (extract.includes('present') && /\d{4}\s*[–-]\s*present/.test(extract)) {
+    const isStillAlive = extract.includes('present') && /\d{4}\s*[–-]\s*present/.test(extract);
+    
+    if (isStillAlive) {
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +103,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const isDead = deathIndicators.some(indicator => {
+    const isDead = hasDeathCategory || deathIndicators.some(indicator => {
       if (indicator instanceof RegExp) {
         return indicator.test(extract);
       }

@@ -50,7 +50,7 @@ exports.handler = async (event) => {
         format: 'json',
         inprop: 'url',
         exlimit: 1,
-        exchars: 2000  // Get first 2000 characters instead of just intro
+        exchars: 5000  // Get first 5000 characters to catch historical figures
       }
     });
 
@@ -68,22 +68,27 @@ exports.handler = async (event) => {
 
     // Check for death indicators in the text
     const extract = page.extract.toLowerCase();
+    const originalExtract = page.extract; // Keep original for regex
     const categories = page.categories || [];
     
     // Check categories for death-related ones
-    const hasDeathCategory = categories.some(cat => 
-      cat.title.toLowerCase().includes('deaths') || 
-      cat.title.toLowerCase().includes('deceased')
-    );
+    const hasDeathCategory = categories.some(cat => {
+      const catTitle = cat.title.toLowerCase();
+      return catTitle.includes('deaths') || 
+             catTitle.includes('deceased') ||
+             /\d{4}\s+deaths/.test(catTitle);  // e.g., "1945 deaths"
+    });
     
     const deathIndicators = [
-      /\d{4}\s*[-–—]\s*\d{4}/,  // Birth-death year pattern like "1947 – 2016"
+      /\b\d{4}\s*[-–—]\s*\d{4}\b/,  // Birth-death year pattern like "1947 – 2016"
       /\(\s*\d{4}\s*[-–—]\s*\d{4}\s*\)/,  // (1947 – 2016)
-      /january|february|march|april|may|june|july|august|september|october|november|december\s+\d{1,2},?\s+\d{4}/i,  // Date of death
+      /born.*\d{4}.*died.*\d{4}/i,  // "born 1930...died 2025"
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}/i,  // Date like "April 30, 1945"
       'died',
       'death',
       'passed away',
-      'deceased'
+      'deceased',
+      'suicide'
     ];
 
     // Check if "present" appears (means they're alive)
@@ -105,7 +110,7 @@ exports.handler = async (event) => {
 
     const isDead = hasDeathCategory || deathIndicators.some(indicator => {
       if (indicator instanceof RegExp) {
-        return indicator.test(extract);
+        return indicator.test(originalExtract);  // Use original text for regex with case sensitivity
       }
       return extract.includes(indicator);
     });

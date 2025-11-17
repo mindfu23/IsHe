@@ -9,7 +9,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { name, wikiData, newsArticles } = JSON.parse(event.body);
+    const { name, wikiData, newsArticles, googleData } = JSON.parse(event.body);
     
     if (!name) {
       return {
@@ -33,6 +33,12 @@ exports.handler = async (event) => {
 
     // Prepare context for Claude
     let context = `I need to determine if ${name} is deceased or still alive.\n\n`;
+    
+    if (googleData && googleData.found) {
+      context += `Google Knowledge Graph:\nHas death date: ${googleData.hasDied}\n`;
+      if (googleData.deathDate) context += `Death date: ${googleData.deathDate}\n`;
+      if (googleData.birthDate) context += `Birth date: ${googleData.birthDate}\n\n`;
+    }
     
     if (wikiData && wikiData.found) {
       context += `Wikipedia information:\nTitle: ${wikiData.title}\nExtract: ${wikiData.extract}\n\n`;

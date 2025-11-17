@@ -28,7 +28,36 @@ export default function App() {
     setCheckedCelebrity(celebrity);
     
     try {
-      // Check Wikipedia first for more reliable information
+      // 1. Check Google Knowledge Graph first (most reliable)
+      let googleData = null;
+      try {
+        const googleResponse = await axios.post('/.netlify/functions/google-search', {
+          name: celebrity
+        });
+        googleData = googleResponse.data;
+        
+        // If Google has definitive info, use it
+        if (googleData && googleData.found) {
+          if (googleData.hasDied) {
+            setResult({
+              dead: true,
+              news: {
+                title: `${celebrity} (Google Knowledge Graph)`,
+                description: `Death date: ${googleData.deathDate || 'Confirmed deceased'}`,
+                url: `https://www.google.com/search?q=${encodeURIComponent(celebrity)}`
+              }
+            });
+            setLoading(false);
+            return;
+          }
+          // If Google shows no death date and has birth info, likely alive
+          // But continue checking other sources to be sure
+        }
+      } catch (googleError) {
+        console.warn('Google check failed, continuing with other sources:', googleError);
+      }
+      
+      // 2. Check Wikipedia for more reliable information
       let wikiData = null;
       try {
         const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
@@ -40,20 +69,21 @@ export default function App() {
         // Continue to news API if Wikipedia fails
       }
       
-      // Get news articles
+      // 3. Get news articles
       const response = await axios.post('/.netlify/functions/news-proxy', {
         query: `${celebrity} death`
       });
       
       const articles = response.data.articles;
       
-      // Use AI to verify the information
+      // 4. Use AI to verify the information
       let aiVerification = null;
       try {
         const aiResponse = await axios.post('/.netlify/functions/ai-verify', {
           name: celebrity,
           wikiData: wikiData,
-          newsArticles: articles
+          newsArticles: articles,
+          googleData: googleData
         });
         aiVerification = aiResponse.data;
       } catch (aiError) {

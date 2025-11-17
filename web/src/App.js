@@ -30,6 +30,13 @@ export default function App() {
       // Get API key from environment variable
       const apiKey = process.env.REACT_APP_NEWS_API_KEY;
       
+      // Debug logging (remove after testing)
+      console.log('Environment check:', {
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey ? apiKey.length : 0,
+        allEnvVars: Object.keys(process.env).filter(key => key.startsWith('REACT_APP_'))
+      });
+      
       if (!apiKey) {
         setError('News API key is not configured. Please add REACT_APP_NEWS_API_KEY to your .env file.');
         setLoading(false);

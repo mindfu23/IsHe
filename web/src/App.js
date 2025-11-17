@@ -7,7 +7,7 @@ const BRAIN_TEASER_URLS = [
   'https://www.riddles.com/',
   'https://www.brainzilla.com/',
   'https://www.funology.com/riddles/',
-  'https://www.puzzleprime.com/',
+  'https://www.puzzleprime.com/puzzles/',
 ];
 
 export default function App() {

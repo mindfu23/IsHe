@@ -40,7 +40,64 @@ export default function App() {
         // Continue to news API if Wikipedia fails
       }
       
-      // If Wikipedia confirms death, trust that
+      // Get news articles
+      const response = await axios.post('/.netlify/functions/news-proxy', {
+        query: `${celebrity} death`
+      });
+      
+      const articles = response.data.articles;
+      
+      // Use AI to verify the information
+      let aiVerification = null;
+      try {
+        const aiResponse = await axios.post('/.netlify/functions/ai-verify', {
+          name: celebrity,
+          wikiData: wikiData,
+          newsArticles: articles
+        });
+        aiVerification = aiResponse.data;
+      } catch (aiError) {
+        console.warn('AI verification failed, using fallback logic:', aiError);
+      }
+      
+      // If AI is available and confident, use its decision
+      if (aiVerification && aiVerification.available && 
+          aiVerification.confidence === 'high') {
+        if (aiVerification.isDead) {
+          // Find the most relevant article or use Wikipedia
+          const relevantSource = wikiData && wikiData.found ? {
+            title: `${wikiData.title} - ${aiVerification.reasoning}`,
+            description: wikiData.extract,
+            url: wikiData.url
+          } : articles[0] || {
+            title: aiVerification.reasoning,
+            url: '#'
+          };
+          
+          setResult({
+            dead: true,
+            news: relevantSource
+          });
+          setLoading(false);
+          return;
+        } else {
+          // AI says they're alive
+          setResult({ dead: false });
+          setTeaserUrl(BRAIN_TEASER_URLS[Math.floor(Math.random() * BRAIN_TEASER_URLS.length)]);
+          
+          const topic = POSITIVE_NEWS_TOPICS[Math.floor(Math.random() * POSITIVE_NEWS_TOPICS.length)];
+          const posResponse = await axios.post('/.netlify/functions/news-proxy', {
+            query: topic
+          });
+          
+          const posArticle = posResponse.data.articles[0];
+          setPositiveNewsUrl(posArticle ? posArticle.url : 'https://www.goodnewsnetwork.org/');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback: If Wikipedia confirms death, trust that
       if (wikiData && wikiData.found && wikiData.isDead) {
         setResult({
           dead: true,
@@ -55,11 +112,6 @@ export default function App() {
       }
       
       // Otherwise, check news API with stricter filtering
-      const response = await axios.post('/.netlify/functions/news-proxy', {
-        query: `${celebrity} death`
-      });
-      
-      const articles = response.data.articles;
       
       // More strict checking: the celebrity name and death-related words must be close together
       const celebrityLower = celebrity.toLowerCase();

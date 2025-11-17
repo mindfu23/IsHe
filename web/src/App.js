@@ -29,14 +29,19 @@ export default function App() {
     
     try {
       // Check Wikipedia first for more reliable information
-      const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
-        name: celebrity
-      });
-      
-      const wikiData = wikiResponse.data;
+      let wikiData = null;
+      try {
+        const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
+          name: celebrity
+        });
+        wikiData = wikiResponse.data;
+      } catch (wikiError) {
+        console.warn('Wikipedia check failed, continuing with news API:', wikiError);
+        // Continue to news API if Wikipedia fails
+      }
       
       // If Wikipedia confirms death, trust that
-      if (wikiData.found && wikiData.isDead) {
+      if (wikiData && wikiData.found && wikiData.isDead) {
         setResult({
           dead: true,
           news: {

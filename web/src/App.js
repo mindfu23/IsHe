@@ -65,39 +65,48 @@ export default function App() {
       const celebrityLower = celebrity.toLowerCase();
       
       const deathNews = articles.find(article => {
-        const text = (article.title + ' ' + article.description).toLowerCase();
-        const celebrityWords = celebrityLower.split(' ');
+        const titleLower = article.title.toLowerCase();
+        const descLower = (article.description || '').toLowerCase();
+        const fullText = titleLower + ' ' + descLower;
         
         // Check if celebrity name appears in the text
-        const hasCelebrityName = celebrityWords.every(word => 
-          word.length > 2 && text.includes(word)
-        );
+        const celebrityWords = celebrityLower.split(' ').filter(w => w.length > 2);
+        const hasCelebrityName = celebrityWords.every(word => fullText.includes(word));
         
         if (!hasCelebrityName) return false;
         
-        // Look for strong death indicators near the celebrity's name
-        const deathPhrases = [
+        // Look for strong death indicators
+        const strongDeathIndicators = [
           'has died',
           'died at',
-          'passed away',
-          'found dead',
-          'death of',
-          'is dead',
-          'confirmed dead',
-          'pronounced dead',
           'died on',
           'dies at',
-          'obituary',
-          'funeral'
+          'passed away',
+          'found dead',
+          'death of ' + celebrityLower,
+          celebrityLower + ' is dead',
+          celebrityLower + ' dead',
+          'confirmed dead',
+          'pronounced dead',
+          'obituary'
         ];
         
-        // Check if any death phrase appears in title or first sentence of description
-        const titleAndFirstSentence = article.title + ' ' + 
-          (article.description ? article.description.split('.')[0] : '');
+        // Check title first (most reliable)
+        if (strongDeathIndicators.some(phrase => titleLower.includes(phrase))) {
+          return true;
+        }
         
-        return deathPhrases.some(phrase => 
-          titleAndFirstSentence.toLowerCase().includes(phrase)
-        );
+        // Also check description for death confirmation
+        if (descLower.includes('died') || descLower.includes('death') || 
+            descLower.includes('passed away') || descLower.includes('obituary')) {
+          // Make sure it's not about someone else dying or a movie/fictional death
+          const isAboutCelebrity = celebrityWords.some(word => 
+            descLower.substring(0, 200).includes(word)
+          );
+          return isAboutCelebrity;
+        }
+        
+        return false;
       });
       
       if (deathNews) {

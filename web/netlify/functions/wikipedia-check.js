@@ -67,13 +67,33 @@ exports.handler = async (event) => {
 
     // Check for death indicators in the first paragraph
     const extract = page.extract.toLowerCase();
+    const title = page.title.toLowerCase();
+    
     const deathIndicators = [
+      /\d{4}\s*[-–—]\s*\d{4}/,  // Birth-death year pattern like "1947 – 2016"
+      /\(\s*\d{4}\s*[-–—]\s*\d{4}\s*\)/,  // (1947 – 2016)
       'died',
       'death',
       'passed away',
       'deceased',
-      /\d{4}\s*[-–]\s*\d{4}/  // Birth-death year pattern like "1947 – 2016"
+      /died\s+\w+\s+\d{1,2},?\s+\d{4}/,  // died January 1, 2024
+      /\d{4}\s*–\s*present/  // Still alive indicator
     ];
+
+    // Check if "present" appears (means they're alive)
+    if (extract.includes('present') && /\d{4}\s*[–-]\s*present/.test(extract)) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          found: true,
+          title: page.title,
+          extract: page.extract.substring(0, 500),
+          isDead: false,
+          url: page.fullurl
+        })
+      };
+    }
 
     const isDead = deathIndicators.some(indicator => {
       if (indicator instanceof RegExp) {

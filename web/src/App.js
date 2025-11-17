@@ -12,6 +12,7 @@ const BRAIN_TEASER_URLS = [
 
 export default function App() {
   const [celebrity, setCelebrity] = useState('');
+  const [checkedCelebrity, setCheckedCelebrity] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -24,6 +25,7 @@ export default function App() {
     setResult(null);
     setPositiveNewsUrl('');
     setTeaserUrl('');
+    setCheckedCelebrity(celebrity);
     
     try {
       // Call serverless function instead of NewsAPI directly
@@ -89,7 +91,7 @@ export default function App() {
       
       {result && result.dead && (
         <div className="result-box">
-          <div className="dead-text">Yes, {celebrity} appears to be dead.</div>
+          <div className="dead-text">Yes, {checkedCelebrity} appears to be dead.</div>
           <div className="news-title">{result.news.title}</div>
           <button 
             className="btn-secondary"
@@ -102,7 +104,7 @@ export default function App() {
       
       {result && !result.dead && (
         <div className="result-box">
-          <div className="alive-text">No, {celebrity} is not dead!</div>
+          <div className="alive-text">No, {checkedCelebrity} is not dead!</div>
           <button 
             className="btn-secondary"
             onClick={() => window.open(teaserUrl, '_blank')}

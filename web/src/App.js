@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const GOOGLE_NEWS_API = 'https://newsapi.org/v2/everything';
 const POSITIVE_NEWS_TOPICS = ['good news', 'uplifting', 'positive stories'];
 const BRAIN_TEASER_URLS = [
   'https://www.riddles.com/',
@@ -27,29 +26,9 @@ export default function App() {
     setTeaserUrl('');
     
     try {
-      // Get API key from environment variable
-      const apiKey = process.env.REACT_APP_NEWS_API_KEY;
-      
-      // Debug logging (remove after testing)
-      console.log('Environment check:', {
-        hasApiKey: !!apiKey,
-        apiKeyLength: apiKey ? apiKey.length : 0,
-        allEnvVars: Object.keys(process.env).filter(key => key.startsWith('REACT_APP_'))
-      });
-      
-      if (!apiKey) {
-        setError('News API key is not configured. Please add REACT_APP_NEWS_API_KEY to your .env file.');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get(GOOGLE_NEWS_API, {
-        params: {
-          q: `${celebrity} death`,
-          sortBy: 'publishedAt',
-          language: 'en',
-          apiKey,
-        },
+      // Call serverless function instead of NewsAPI directly
+      const response = await axios.post('/.netlify/functions/news-proxy', {
+        query: `${celebrity} death`
       });
       
       const articles = response.data.articles;
@@ -69,13 +48,8 @@ export default function App() {
         
         // Get positive news
         const topic = POSITIVE_NEWS_TOPICS[Math.floor(Math.random() * POSITIVE_NEWS_TOPICS.length)];
-        const posResponse = await axios.get(GOOGLE_NEWS_API, {
-          params: {
-            q: topic,
-            sortBy: 'publishedAt',
-            language: 'en',
-            apiKey,
-          },
+        const posResponse = await axios.post('/.netlify/functions/news-proxy', {
+          query: topic
         });
         
         const posArticle = posResponse.data.articles[0];

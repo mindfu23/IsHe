@@ -28,15 +28,72 @@ export default function App() {
     setCheckedCelebrity(celebrity);
     
     try {
-      // Call serverless function instead of NewsAPI directly
+      // Check Wikipedia first for more reliable information
+      const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
+        name: celebrity
+      });
+      
+      const wikiData = wikiResponse.data;
+      
+      // If Wikipedia confirms death, trust that
+      if (wikiData.found && wikiData.isDead) {
+        setResult({
+          dead: true,
+          news: {
+            title: `${wikiData.title} (Wikipedia)`,
+            description: wikiData.extract,
+            url: wikiData.url
+          }
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Otherwise, check news API with stricter filtering
       const response = await axios.post('/.netlify/functions/news-proxy', {
         query: `${celebrity} death`
       });
       
       const articles = response.data.articles;
-      const deathNews = articles.find(article =>
-        /dead|death|dies|passed away|obituary/i.test(article.title + article.description)
-      );
+      
+      // More strict checking: the celebrity name and death-related words must be close together
+      const celebrityLower = celebrity.toLowerCase();
+      
+      const deathNews = articles.find(article => {
+        const text = (article.title + ' ' + article.description).toLowerCase();
+        const celebrityWords = celebrityLower.split(' ');
+        
+        // Check if celebrity name appears in the text
+        const hasCelebrityName = celebrityWords.every(word => 
+          word.length > 2 && text.includes(word)
+        );
+        
+        if (!hasCelebrityName) return false;
+        
+        // Look for strong death indicators near the celebrity's name
+        const deathPhrases = [
+          'has died',
+          'died at',
+          'passed away',
+          'found dead',
+          'death of',
+          'is dead',
+          'confirmed dead',
+          'pronounced dead',
+          'died on',
+          'dies at',
+          'obituary',
+          'funeral'
+        ];
+        
+        // Check if any death phrase appears in title or first sentence of description
+        const titleAndFirstSentence = article.title + ' ' + 
+          (article.description ? article.description.split('.')[0] : '');
+        
+        return deathPhrases.some(phrase => 
+          titleAndFirstSentence.toLowerCase().includes(phrase)
+        );
+      });
       
       if (deathNews) {
         setResult({

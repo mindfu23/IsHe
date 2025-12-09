@@ -28,191 +28,169 @@ export default function App() {
     setCheckedCelebrity(celebrity);
     
     try {
-      // 1. Check Google Knowledge Graph first (most reliable)
+      // Step 1: Check Google for result count and knowledge graph info
       let googleData = null;
       try {
         const googleResponse = await axios.post('/.netlify/functions/google-search', {
           name: celebrity
         });
         googleData = googleResponse.data;
+        console.log('Google data:', googleData);
         
-        // If Google has definitive info, use it
-        if (googleData && googleData.found) {
-          if (googleData.hasDied) {
-            setResult({
-              dead: true,
-              news: {
-                title: `${celebrity} (Google Knowledge Graph)`,
-                description: `Death date: ${googleData.deathDate || 'Confirmed deceased'}`,
-                url: `https://www.google.com/search?q=${encodeURIComponent(celebrity)}`
-              }
-            });
-            setLoading(false);
-            return;
-          }
-          // If Google shows no death date and has birth info, likely alive
-          // But continue checking other sources to be sure
+        // If Google has definitive death info in knowledge graph, use it
+        if (googleData && googleData.found && googleData.hasDied) {
+          setResult({
+            dead: true,
+            news: {
+              title: `${celebrity} (Google Knowledge Graph)`,
+              description: `Death date: ${googleData.deathDate || 'Confirmed deceased'}`,
+              url: `https://www.google.com/search?q=${encodeURIComponent(celebrity)}`
+            }
+          });
+          setLoading(false);
+          return;
         }
       } catch (googleError) {
         console.warn('Google check failed, continuing with other sources:', googleError);
       }
       
-      // 2. Check Wikipedia for more reliable information
+      // Step 2: If famous (>20M results), check Wikipedia
+      const isFamous = googleData && googleData.isFamous;
+      console.log('Is famous:', isFamous, 'Result count:', googleData?.resultCount);
+      
       let wikiData = null;
+      if (isFamous) {
+        try {
+          const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
+            name: celebrity
+          });
+          wikiData = wikiResponse.data;
+          console.log('Wikipedia data:', wikiData);
+          
+          // If Wikipedia confirms death, trust it
+          if (wikiData && wikiData.found && wikiData.isDead) {
+            setResult({
+              dead: true,
+              news: {
+                title: `${wikiData.title} (Wikipedia)`,
+                description: wikiData.extract,
+                url: wikiData.url
+              }
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (wikiError) {
+          console.warn('Wikipedia check failed:', wikiError);
+        }
+      }
+      
+      // Step 3: If Wikipedia doesn't show death (or person not famous), check NewsAPI
+      // Use death-specific search with keywords: dies, dead, passes away, etc.
+      let newsDeathCheck = null;
       try {
-        const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
+        const newsResponse = await axios.post('/.netlify/functions/news-proxy', {
+          deathCheck: true,
           name: celebrity
         });
-        wikiData = wikiResponse.data;
-      } catch (wikiError) {
-        console.warn('Wikipedia check failed, continuing with news API:', wikiError);
-        // Continue to news API if Wikipedia fails
-      }
-      
-      // 3. Get news articles
-      const response = await axios.post('/.netlify/functions/news-proxy', {
-        query: `${celebrity} death`
-      });
-      
-      const articles = response.data.articles;
-      
-      // 4. Use AI to verify the information
-      let aiVerification = null;
-      try {
-        const aiResponse = await axios.post('/.netlify/functions/ai-verify', {
-          name: celebrity,
-          wikiData: wikiData,
-          newsArticles: articles,
-          googleData: googleData
-        });
-        aiVerification = aiResponse.data;
-      } catch (aiError) {
-        console.warn('AI verification failed, using fallback logic:', aiError);
-      }
-      
-      // If AI is available and confident, use its decision
-      if (aiVerification && aiVerification.available && 
-          aiVerification.confidence === 'high') {
-        if (aiVerification.isDead) {
-          // Find the most relevant article or use Wikipedia
-          const relevantSource = wikiData && wikiData.found ? {
-            title: `${wikiData.title} - ${aiVerification.reasoning}`,
-            description: wikiData.extract,
-            url: wikiData.url
-          } : articles[0] || {
-            title: aiVerification.reasoning,
-            url: '#'
-          };
+        newsDeathCheck = newsResponse.data;
+        console.log('News death check:', newsDeathCheck);
+        
+        if (newsDeathCheck && newsDeathCheck.articles && newsDeathCheck.articles.length > 0) {
+          // Found death-related news, verify it's about this person actually dying
+          const deathArticle = newsDeathCheck.articles[0];
           
-          setResult({
-            dead: true,
-            news: relevantSource
-          });
-          setLoading(false);
-          return;
-        } else {
-          // AI says they're alive
-          setResult({ dead: false });
-          setTeaserUrl(BRAIN_TEASER_URLS[Math.floor(Math.random() * BRAIN_TEASER_URLS.length)]);
-          
-          const topic = POSITIVE_NEWS_TOPICS[Math.floor(Math.random() * POSITIVE_NEWS_TOPICS.length)];
-          const posResponse = await axios.post('/.netlify/functions/news-proxy', {
-            query: topic
-          });
-          
-          const posArticle = posResponse.data.articles[0];
-          setPositiveNewsUrl(posArticle ? posArticle.url : 'https://www.goodnewsnetwork.org/');
-          setLoading(false);
-          return;
-        }
-      }
-      
-      // Fallback: If Wikipedia confirms death, trust that
-      if (wikiData && wikiData.found && wikiData.isDead) {
-        setResult({
-          dead: true,
-          news: {
-            title: `${wikiData.title} (Wikipedia)`,
-            description: wikiData.extract,
-            url: wikiData.url
+          // Additional verification: Use AI if available
+          let aiVerification = null;
+          try {
+            const aiResponse = await axios.post('/.netlify/functions/ai-verify', {
+              name: celebrity,
+              wikiData: wikiData,
+              newsArticles: newsDeathCheck.articles,
+              googleData: googleData
+            });
+            aiVerification = aiResponse.data;
+          } catch (aiError) {
+            console.warn('AI verification failed:', aiError);
           }
-        });
-        setLoading(false);
-        return;
+          
+          // If AI is confident about death, use it
+          if (aiVerification && aiVerification.available && 
+              aiVerification.confidence === 'high' && aiVerification.isDead) {
+            setResult({
+              dead: true,
+              news: {
+                title: deathArticle.title,
+                description: deathArticle.description || aiVerification.reasoning,
+                url: deathArticle.url
+              }
+            });
+            setLoading(false);
+            return;
+          }
+          
+          // Otherwise, if we have strong news evidence
+          const titleLower = deathArticle.title.toLowerCase();
+          const strongDeathPhrases = ['has died', 'dies at', 'passed away', 'dead at', 'found dead', 'obituary'];
+          const hasStrongEvidence = strongDeathPhrases.some(phrase => titleLower.includes(phrase));
+          
+          if (hasStrongEvidence) {
+            setResult({
+              dead: true,
+              news: deathArticle
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (newsError) {
+        console.warn('News death check failed:', newsError);
       }
       
-      // Otherwise, check news API with stricter filtering
-      
-      // More strict checking: the celebrity name and death-related words must be close together
-      const celebrityLower = celebrity.toLowerCase();
-      
-      const deathNews = articles.find(article => {
-        const titleLower = article.title.toLowerCase();
-        const descLower = (article.description || '').toLowerCase();
-        const fullText = titleLower + ' ' + descLower;
-        
-        // Check if celebrity name appears in the text
-        const celebrityWords = celebrityLower.split(' ').filter(w => w.length > 2);
-        const hasCelebrityName = celebrityWords.every(word => fullText.includes(word));
-        
-        if (!hasCelebrityName) return false;
-        
-        // Look for strong death indicators
-        const strongDeathIndicators = [
-          'has died',
-          'died at',
-          'died on',
-          'dies at',
-          'passed away',
-          'found dead',
-          'death of ' + celebrityLower,
-          celebrityLower + ' is dead',
-          celebrityLower + ' dead',
-          'confirmed dead',
-          'pronounced dead',
-          'obituary'
-        ];
-        
-        // Check title first (most reliable)
-        if (strongDeathIndicators.some(phrase => titleLower.includes(phrase))) {
-          return true;
+      // Step 4: If not famous, still do a basic Wikipedia and news check
+      if (!isFamous && !wikiData) {
+        try {
+          const wikiResponse = await axios.post('/.netlify/functions/wikipedia-check', {
+            name: celebrity
+          });
+          wikiData = wikiResponse.data;
+          
+          if (wikiData && wikiData.found && wikiData.isDead) {
+            setResult({
+              dead: true,
+              news: {
+                title: `${wikiData.title} (Wikipedia)`,
+                description: wikiData.extract,
+                url: wikiData.url
+              }
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (wikiError) {
+          console.warn('Wikipedia fallback check failed:', wikiError);
         }
-        
-        // Also check description for death confirmation
-        if (descLower.includes('died') || descLower.includes('death') || 
-            descLower.includes('passed away') || descLower.includes('obituary')) {
-          // Make sure it's not about someone else dying or a movie/fictional death
-          const isAboutCelebrity = celebrityWords.some(word => 
-            descLower.substring(0, 200).includes(word)
-          );
-          return isAboutCelebrity;
-        }
-        
-        return false;
-      });
+      }
       
-      if (deathNews) {
-        setResult({
-          dead: true,
-          news: deathNews,
-        });
-      } else {
-        // Not dead, show brain teaser and positive news
-        setResult({ dead: false });
-        setTeaserUrl(BRAIN_TEASER_URLS[Math.floor(Math.random() * BRAIN_TEASER_URLS.length)]);
-        
-        // Get positive news
-        const topic = POSITIVE_NEWS_TOPICS[Math.floor(Math.random() * POSITIVE_NEWS_TOPICS.length)];
+      // No death found - person is alive
+      setResult({ dead: false });
+      setTeaserUrl(BRAIN_TEASER_URLS[Math.floor(Math.random() * BRAIN_TEASER_URLS.length)]);
+      
+      // Get positive news
+      const topic = POSITIVE_NEWS_TOPICS[Math.floor(Math.random() * POSITIVE_NEWS_TOPICS.length)];
+      try {
         const posResponse = await axios.post('/.netlify/functions/news-proxy', {
           query: topic
         });
-        
-        const posArticle = posResponse.data.articles[0];
+        const posArticle = posResponse.data.articles?.[0];
         setPositiveNewsUrl(posArticle ? posArticle.url : 'https://www.goodnewsnetwork.org/');
+      } catch {
+        setPositiveNewsUrl('https://www.goodnewsnetwork.org/');
       }
+      
     } catch (err) {
       console.error('Error:', err);
-      setError('Error fetching news. Please try again.');
+      setError('Error fetching data. Please try again.');
     }
     setLoading(false);
   };

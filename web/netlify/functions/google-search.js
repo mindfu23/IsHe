@@ -19,8 +19,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // Perform Google search
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(name)}`;
+    // Perform Google search with exact name in quotes for better accuracy
+    const searchUrl = `https://www.google.com/search?q="${encodeURIComponent(name)}"`;
     
     const response = await axios.get(searchUrl, {
       headers: {
@@ -29,6 +29,21 @@ exports.handler = async (event) => {
     });
 
     const $ = cheerio.load(response.data);
+    
+    // Extract result count from Google
+    // Usually in format "About X results" or "About X,XXX,XXX results"
+    let resultCount = 0;
+    let isFamous = false;
+    const FAMOUS_THRESHOLD = 20000000; // 20 million
+    
+    const resultStatsText = $('#result-stats').text() || '';
+    const resultMatch = resultStatsText.match(/About\s+([\d,]+)\s+results/i) ||
+                        resultStatsText.match(/([\d,]+)\s+results/i);
+    
+    if (resultMatch) {
+      resultCount = parseInt(resultMatch[1].replace(/,/g, ''));
+      isFamous = resultCount >= FAMOUS_THRESHOLD;
+    }
     
     // Look for death date in Google's Knowledge Graph
     let hasDied = false;
@@ -82,7 +97,9 @@ exports.handler = async (event) => {
         hasDied: hasDied,
         deathDate: deathDate,
         birthDate: birthDate,
-        name: name
+        name: name,
+        resultCount: resultCount,
+        isFamous: isFamous
       })
     };
 

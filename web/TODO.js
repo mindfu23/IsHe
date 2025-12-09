@@ -1,9 +1,9 @@
 // TODO: Future improvements and bug fixes
 // 
 // BUG FIXES:
-// - Fix Woody Allen incorrectly showing as dead
-//   Need to review detection logic - may be false positive from news articles
-//   Check Google/Wikipedia data accuracy for living people
+// - [DONE] Fix Woody Allen incorrectly showing as dead
+//   Updated search logic: Google fame check (>20M results) → Wikipedia → NewsAPI death keywords
+//   More accurate death verification with multiple sources
 //
 // DESIGN:
 // - [DONE] Add orange background to web page

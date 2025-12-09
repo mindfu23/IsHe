@@ -6,9 +6,9 @@
 //   Check Google/Wikipedia data accuracy for living people
 //
 // DESIGN:
-// - Add orange background to web page
-//   Update App.css with orange background color scheme
-//   Consider gradient or solid color
+// - [DONE] Add orange background to web page
+//   Updated App.css and index.css with orange (#FF8C00) background
+//   Navy blue buttons, white title text for contrast
 //
 // FEATURES:
 // - Add email/SMS notification system

@@ -1,5 +1,10 @@
 const axios = require('axios');
 
+// Wikipedia API requires a User-Agent header
+const WIKI_HEADERS = {
+  'User-Agent': 'IsHeDeadYet/1.0 (https://github.com/mindfu23/IsHe)'
+};
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -26,7 +31,8 @@ exports.handler = async (event) => {
         srsearch: name,
         format: 'json',
         srlimit: 1
-      }
+      },
+      headers: WIKI_HEADERS
     });
 
     const searchResults = searchResponse.data.query.search;
@@ -51,7 +57,8 @@ exports.handler = async (event) => {
         inprop: 'url',
         exlimit: 1,
         exchars: 5000  // Get first 5000 characters to catch historical figures
-      }
+      },
+      headers: WIKI_HEADERS
     });
 
     const pages = pageResponse.data.query.pages;
@@ -79,20 +86,37 @@ exports.handler = async (event) => {
              /\d{4}\s+deaths/.test(catTitle);  // e.g., "1945 deaths"
     });
     
+    // First, check for the common Wikipedia bio pattern: "Name (birth date – death date)"
+    // This catches patterns like "August 11, 1953 – July 24, 2025" or "1953 – 2025"
+    const fullDateRangePattern = /(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\s*[–—-]\s*(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}/i;
+    const yearRangePattern = /\b(\d{4})\s*[–—-]\s*(\d{4})\b/;
+    
+    // Check for full date range (birth – death) in first 500 chars (bio intro)
+    const introText = originalExtract.substring(0, 500);
+    const hasFullDateRange = fullDateRangePattern.test(introText);
+    
+    // Check for year range and ensure it's not birth-present
+    const yearMatch = introText.match(yearRangePattern);
+    let hasYearRange = false;
+    if (yearMatch) {
+      const endYear = parseInt(yearMatch[2]);
+      // If end year is a valid death year (not in the future, and after 1900)
+      if (endYear <= new Date().getFullYear() && endYear > 1900) {
+        hasYearRange = true;
+      }
+    }
+    
     const deathIndicators = [
-      /\b\d{4}\s*[-–—]\s*\d{4}\b/,  // Birth-death year pattern like "1947 – 2016"
-      /\(\s*\d{4}\s*[-–—]\s*\d{4}\s*\)/,  // (1947 – 2016)
       /born.*\d{4}.*died.*\d{4}/i,  // "born 1930...died 2025"
-      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}/i,  // Date like "April 30, 1945"
       'died',
-      'death',
       'passed away',
       'deceased',
-      'suicide'
+      ') was an american',  // Past tense "was" after dates often indicates death
+      ') was a '  // Generic past tense pattern
     ];
 
     // Check if "present" appears (means they're alive)
-    const isStillAlive = extract.includes('present') && /\d{4}\s*[–-]\s*present/.test(extract);
+    const isStillAlive = extract.includes('present') && /\d{4}\s*[–-]\s*present/i.test(extract);
     
     if (isStillAlive) {
       return {
@@ -108,7 +132,8 @@ exports.handler = async (event) => {
       };
     }
 
-    const isDead = hasDeathCategory || deathIndicators.some(indicator => {
+    // Determine if dead based on various indicators
+    const isDead = hasDeathCategory || hasFullDateRange || hasYearRange || deathIndicators.some(indicator => {
       if (indicator instanceof RegExp) {
         return indicator.test(originalExtract);  // Use original text for regex with case sensitivity
       }

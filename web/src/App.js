@@ -3,6 +3,7 @@ import axios from 'axios';
 import './App.css';
 
 const POSITIVE_NEWS_TOPICS = ['good news', 'uplifting', 'positive stories'];
+const MIN_FAME_THRESHOLD = 1000000; // 1 million
 const BRAIN_TEASER_URLS = [
   'https://www.riddles.com/',
   'https://www.brainzilla.com/',
@@ -18,6 +19,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [positiveNewsUrl, setPositiveNewsUrl] = useState('');
   const [teaserUrl, setTeaserUrl] = useState('');
+  const [notFamousEnough, setNotFamousEnough] = useState(false);
 
   const checkCelebrity = async () => {
     setLoading(true);
@@ -26,6 +28,7 @@ export default function App() {
     setPositiveNewsUrl('');
     setTeaserUrl('');
     setCheckedCelebrity(celebrity);
+    setNotFamousEnough(false);
     
     try {
       // Step 1: Check Google for result count and knowledge graph info
@@ -172,6 +175,17 @@ export default function App() {
         }
       }
       
+      // Step 5: Check if person is not famous enough to be sure
+      // Less than 1 million Google results AND no Wikipedia page
+      const googleResultCount = googleData?.resultCount || 0;
+      const hasWikipediaPage = wikiData && wikiData.found;
+      
+      if (googleResultCount < MIN_FAME_THRESHOLD && !hasWikipediaPage) {
+        setNotFamousEnough(true);
+        setLoading(false);
+        return;
+      }
+      
       // No death found - person is alive
       setResult({ dead: false });
       setTeaserUrl(BRAIN_TEASER_URLS[Math.floor(Math.random() * BRAIN_TEASER_URLS.length)]);
@@ -248,6 +262,12 @@ export default function App() {
           >
             See Good News
           </button>
+        </div>
+      )}
+      
+      {notFamousEnough && (
+        <div className="result-box">
+          <div className="uncertain-text">They might not be famous enough to be sure.</div>
         </div>
       )}
     </div>

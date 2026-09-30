@@ -1,5 +1,38 @@
 const axios = require('axios');
 
+// First model is the one we want; later ones are used only if an earlier one
+// has been retired (Anthropic answers 404). claude-3-5-sonnet-20241022 was
+// retired, which silently turned this check off.
+const MODELS = ['claude-sonnet-5', 'claude-haiku-4-5'];
+
+async function callClaude(apiKey, prompt) {
+  for (let i = 0; i < MODELS.length; i++) {
+    try {
+      return await axios.post('https://api.anthropic.com/v1/messages', {
+        model: MODELS[i],
+        max_tokens: 500,
+        // Sonnet 5 thinks by default; this short JSON answer doesn't need it,
+        // and thinking would share the 500-token budget.
+        thinking: { type: 'disabled' },
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      }, {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        }
+      });
+    } catch (error) {
+      const retired = error.response && error.response.status === 404;
+      if (!retired || i === MODELS.length - 1) throw error;
+      console.warn(`Model ${MODELS[i]} returned 404 (retired?); falling back to ${MODELS[i + 1]}. Update MODELS in ai-verify.js.`);
+    }
+  }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -59,20 +92,7 @@ exports.handler = async (event) => {
 
 Be very careful about false positives. Only say someone is dead if there is clear evidence.`;
 
-    const response = await axios.post('https://api.anthropic.com/v1/messages', {
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    }, {
-      headers: {
-        'x-api-key': claudeApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      }
-    });
+    const response = await callClaude(claudeApiKey, prompt);
 
     const claudeResponse = response.data.content[0].text;
     

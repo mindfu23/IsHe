@@ -19,7 +19,12 @@ exports.handler = async (event) => {
       };
     }
 
-    const apiKey = process.env.REACT_APP_NEWS_API_KEY;
+    // Server-side only. Not REACT_APP_-prefixed: that prefix is for values
+    // Create React App builds into the public browser bundle.
+    const apiKey = process.env.NEWS_API_KEY;
+    if (!apiKey) {
+      console.warn('NEWS_API_KEY not set in Netlify environment variables');
+    }
     
     // If deathCheck is true, search for death-related news for the person
     if (deathCheck && name) {

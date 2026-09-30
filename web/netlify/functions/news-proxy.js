@@ -21,7 +21,9 @@ exports.handler = async (event) => {
 
     // Server-side only. Not REACT_APP_-prefixed: that prefix is for values
     // Create React App builds into the public browser bundle.
-    const apiKey = process.env.NEWS_API_KEY;
+    // REACT_APP_NEWS_API_KEY is the old name, still set in the Netlify
+    // dashboard; remove the fallback once NEWS_API_KEY replaces it.
+    const apiKey = process.env.NEWS_API_KEY || process.env.REACT_APP_NEWS_API_KEY;
     if (!apiKey) {
       console.warn('NEWS_API_KEY not set in Netlify environment variables');
     }

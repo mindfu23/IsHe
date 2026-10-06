@@ -58,7 +58,7 @@ git push -u origin main
    - Click "Show advanced" → "New variable"
 
 5. **Add Environment Variables**
-   - Variable name: `REACT_APP_NEWS_API_KEY`
+   - Variable name: `NEWS_API_KEY`
    - Value: Your actual NewsAPI.org API key
    - Click "Add"
 
@@ -116,7 +116,7 @@ netlify init
 
 4. Set environment variable:
 ```bash
-netlify env:set REACT_APP_NEWS_API_KEY "your_api_key_here"
+netlify env:set NEWS_API_KEY "your_api_key_here"
 ```
 
 5. Deploy:
@@ -133,7 +133,7 @@ netlify deploy --prod
 1. Make sure you have your API key in `.env`:
 ```bash
 cd /Users/jamesbeach/Documents/visual-studio-code/github-copilot/IsHe/web
-echo "REACT_APP_NEWS_API_KEY=your_api_key" > .env
+echo "NEWS_API_KEY=your_api_key" > .env
 ```
 
 2. Build the project:
@@ -186,7 +186,7 @@ If you deployed manually:
 - Make sure `package.json` has all dependencies
 
 **API not working?**
-- Verify `REACT_APP_NEWS_API_KEY` is set in Netlify environment variables
+- Verify `NEWS_API_KEY` is set in Netlify environment variables
 - Check NewsAPI.org quota (free tier = 100 requests/day)
 - Check browser console for errors
 

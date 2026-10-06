@@ -4,6 +4,7 @@ import './App.css';
 
 const POSITIVE_NEWS_TOPICS = ['good news', 'uplifting', 'positive stories'];
 const MIN_FAME_THRESHOLD = 1000000; // 1 million
+const DAILY_LIMIT_MESSAGE = "You've reached today's limit of lookups. Please try again tomorrow.";
 const BRAIN_TEASER_URLS = [
   'https://www.riddles.com/',
   'https://www.brainzilla.com/',
@@ -106,14 +107,28 @@ export default function App() {
           // Additional verification: Use AI if available
           let aiVerification = null;
           try {
+            // Send only what the prompt uses (the server caps each field too).
             const aiResponse = await axios.post('/.netlify/functions/ai-verify', {
               name: celebrity,
-              wikiData: wikiData,
-              newsArticles: newsDeathCheck.articles,
-              googleData: googleData
+              wikiData: wikiData && {
+                found: wikiData.found,
+                title: wikiData.title,
+                extract: wikiData.extract
+              },
+              newsArticles: newsDeathCheck.articles.slice(0, 5).map(a => ({
+                title: a.title,
+                description: a.description
+              })),
+              googleData: googleData && {
+                found: googleData.found,
+                hasDied: googleData.hasDied,
+                deathDate: googleData.deathDate,
+                birthDate: googleData.birthDate
+              }
             });
             aiVerification = aiResponse.data;
           } catch (aiError) {
+            // Includes the daily AI limit (429): fall back to the news heuristics below.
             console.warn('AI verification failed:', aiError);
           }
           
@@ -147,6 +162,12 @@ export default function App() {
           }
         }
       } catch (newsError) {
+        // Daily limit hit: say so instead of reporting "not dead" without a news check.
+        if (newsError.response && newsError.response.status === 429) {
+          setError(DAILY_LIMIT_MESSAGE);
+          setLoading(false);
+          return;
+        }
         console.warn('News death check failed:', newsError);
       }
       

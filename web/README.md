@@ -25,7 +25,7 @@ cp .env.example .env
 
 4. Add your API key to the `.env` file:
 ```
-REACT_APP_NEWS_API_KEY=your_actual_api_key_here
+NEWS_API_KEY=your_actual_api_key_here
 ```
 
 ## Running Locally
@@ -50,7 +50,7 @@ See `DEPLOYMENT.md` for detailed instructions on deploying to Netlify.
 
 ## Environment Variables
 
-- `REACT_APP_NEWS_API_KEY` - Your NewsAPI.org API key (required)
+- `NEWS_API_KEY` - Your NewsAPI.org API key (required)
 
 ## Technologies Used
 

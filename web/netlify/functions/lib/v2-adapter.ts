@@ -39,7 +39,9 @@ export function asV2(handler: Handler) {
     for (const [key, values] of Object.entries(res.multiValueHeaders ?? {})) {
       for (const value of values) out.append(key, String(value));
     }
-    const body = res.isBase64Encoded && res.body ? Buffer.from(res.body, 'base64') : res.body;
+    // 204/205/304 must have a null body: `new Response('', { status: 204 })` throws (e.g. a CORS preflight)
+    const nullBody = [204, 205, 304].includes(res.statusCode);
+    const body = nullBody ? null : res.isBase64Encoded && res.body ? Buffer.from(res.body, 'base64') : res.body;
     return new Response(body ?? null, { status: res.statusCode, headers: out });
   };
 }
